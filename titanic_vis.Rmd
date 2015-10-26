@@ -71,6 +71,7 @@ titanic <- read.csv('./data/train.csv')
         * However, our linear model might be missing something important. Maybe this gender effect is absent for really young children. In 2.b.1 this supports that conclusion. Both males and females of 1 and 2nd class have a 100% survival rate, although we should probably note that this may not be a strong pattern as there is a lack of data. Once we get into 3rd class things change. There is a general trend to do poorly as they get older. Basically, this points to the need for some child specific modelling, especially for third class.
             * Ideas: 1) Parents and siblings. If they have multiple parents on board they will be more likely to survive. Do they have siblings. What are their ages? Older siblings might help them to get to the top deck. Younger siblings might have been given priority over them. 
     * d. What about the deck. Being below deck would lower the chances of survival.
+    * At this point, I can't really see anything in cabin category or cabin number. There is a good chance that what I did find is a result of correlations with other causually implicated variables such as the number of women or children in that deck. 
 ```{r fig.width=7, fig.height=6, echo=FALSE}
 # 1.
 titanic %>% summarize(mean(Survived))
@@ -94,7 +95,7 @@ ggplot(data = titanic %>% filter(!is.na(Age)),
   stat_smooth(method="glm",family="binomial") + facet_wrap(~Sex + Pclass,ncol=3)
 
 # 2.c.1 Modelling really young children.
-ggplot(data = titanic %>% filter(Age < 12),
+ggplot(data = titanic %>% filter(Age < 15),
        aes(x = Age, y = Survived)) +
   stat_smooth(method="glm",family="binomial") + facet_wrap(~Sex + Pclass,ncol=3)
     
@@ -102,11 +103,40 @@ ggplot(data = titanic %>% filter(Age < 12),
 titanic_cabins <- titanic %>% filter(!Cabin == "") %>% mutate(cabin_category = substr(Cabin,1,1)) %>% 
   mutate(cabin_nr = as.numeric(str_extract(Cabin,"[0-9]+")))
 
-titanic_cabins %>% group_by(cabin_category) %>% summarize(count = n(), surv_prop = mean(Survived))
+titanic_cabins %>% group_by(cabin_category) %>%
+  summarize(count = n(), surv_prop = mean(Survived), mean(Fare), number_of_children = sum(Age < 15,na.rm=T)/count, number_of_men = sum(Sex == "male", na.rm=T)/count)
 
+# Let's use vis to understand this cabin situation.
 ggplot(data = titanic_cabins, aes(x = cabin_nr, y = Survived)) + 
-  stat_smooth(method="glm", family="binomial") + facet_wrap(~cabin_category,ncol=3)
-
+  stat_smooth(method = "gam", family="binomial") +
+  geom_point(aes(colour=factor(Pclass))) + facet_wrap(~cabin_category,ncol=3)
 
 ```
 
+#### A closer look at the cabin issue.
+### Hard to say what is going 
+```{r }
+
+# What does the distribution of cabins look like for different classes?
+titanic %>% 
+  mutate(has_cabin = ifelse(Cabin == "", 0,1)) %>%
+  group_by(Pclass) %>%
+  summarize(cabin_proportion = mean(has_cabin))
+
+# What's going on with the first class passengers who don't have cabins. That's weird. Looks like it is just missing data.
+
+titanic %>% 
+  filter(Pclass == 1 & Cabin == "")
+
+# What about the second class passengers that have a cabin?
+titanic %>% 
+  filter(Pclass == 2 & Cabin != "")
+```
+
+#### Coming up: Analysis of the type of family relations you have onboard helps to show us something about survivability.
+    * Ideas. If you are a child and have no parents or siblings on board you might have a lower chance of survival.
+      * If you are a woman with a child it might be more likely that you get on board.
+      * If you are a woman with a husband, you might have greater chances.
+      * Siblings might influence things, not sure how.
+      * If you are a male, you would sacrifice for your child.
+```{r }
