@@ -54,6 +54,12 @@ require(stringr)
 
 titanic <- read.csv('./data/train.csv')
 
+titanic <- titanic %>% select(-Title)
+
+titanic <- titanic %>% mutate(Title = ifelse(grepl("Mrs.", Name), "Mrs",
+                           ifelse(grepl("Miss.", Name), "Miss",
+                           ifelse(grepl("Mr.", Name), "Mr", NA))))
+
 ```
 
 #### Some basics.
@@ -111,6 +117,22 @@ ggplot(data = titanic_cabins, aes(x = cabin_nr, y = Survived)) +
   stat_smooth(method = "gam", family="binomial") +
   geom_point(aes(colour=factor(Pclass))) + facet_wrap(~cabin_category,ncol=3)
 
+# What about women in the third class. What helps them survive?
+# I think this says, being married or not, doesn't really matter. But age matters. The older you are the worse off you are.
+titanic %>% filter(Sex == "female" & Pclass == 3 & Age > 18) %>%
+  ggplot(., aes(x = Age,y = Survived)) + stat_smooth(method="glm", family="binomial") + facet_grid(~Title)
+
+# What about men and class.
+titanic %>% filter(Sex == "male" & !is.na(Age)) %>% 
+  group_by(Pclass,age_group = cut(Age,15,labels=FALSE)) %>%
+  summarize(prop_surv = mean(Survived)) %>%
+  ggplot(., aes(x = age_group, y = prop_surv)) + geom_histogram(stat="identity") + facet_grid(~Pclass)
+
+
+
+  ggplot(., aes(x = Age,y = Survived)) + stat_smooth(method="glm", family="binomial") + facet_grid(~Pclass)
+
+
 ```
 
 #### A closer look at the cabin issue.
@@ -140,3 +162,40 @@ titanic %>%
       * Siblings might influence things, not sure how.
       * If you are a male, you would sacrifice for your child.
 ```{r }
+
+titanic %>% filter(Sex == "female" & !is.na(Title)) %>% 
+  group_by(Title) %>% 
+  summarize(surv = mean(Survived))
+
+titanic %>% filter(Sex == "female" & Title == "Mrs") %>% 
+  group_by(Parch) %>% 
+  summarize(surv = mean(Survived))
+
+titanic %>% filter(Sex == "female") %>%
+  group_by(Pclass) %>%
+  summarize(mean(Survived))
+
+titanic %>% filter(Sex == "female" & Pclass == 3) %>%
+  group_by(Title) %>%
+  summarize(mean(Survived))
+
+# Look at this. Could it be that adult women with husbands on board. I wonder. Can we explain this with the idea that women who had a spouse on board were more likely to refuse to get on to a liferaft, if offered the opportunity. Or perhaps, they were just a little less decisive with opting to board and lost their place. Something to consider for the model. 
+titanic %>% filter(Title == "Mrs" & Age > 18) %>%
+  group_by(Title,SibSp, Pclass) %>%
+  summarize(mean(Survived),count=n())
+
+
+# What about men who have families. This is also interesting. Generally speaking, Men with families fared very poorly. It very well could have been that this was because they let their families on first, and then never got the opportunity to get on another raft. The rafts probably filled up pretty quick and once they finished helping their wives or children get on, it may just not have been possible to get anyone else on those things. Would be worthwhlile to consider whether the reason that some of the first class passengers who had familes ended up getting a raft was because they were extremely high status and were able to negotiate their way on.
+titanic %>% filter(Sex == "male", Age > 20) %>% mutate(dependents = ifelse(Parch > 0, 1,0)) %>%
+  group_by(Pclass,dependents) %>%
+  summarize(number = n(),mean = mean(Survived))
+```
+
+
+#### What about the idea that passengers that embarked in England had a better chance of survival because they would be likely to speak the language of the crew.
+```{r echo = F}
+
+# Confusing. But overall, I think it says that where you boarded doesn't really seem to matter.
+titanic %>% group_by(Embarked,Pclass,Sex) %>% summarize(mean(Survived), n(), mean(Fare))
+
+```
