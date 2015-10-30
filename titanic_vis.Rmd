@@ -197,5 +197,21 @@ titanic %>% filter(Sex == "male", Age > 20) %>% mutate(dependents = ifelse(Parch
 
 # Confusing. But overall, I think it says that where you boarded doesn't really seem to matter.
 titanic %>% group_by(Embarked,Pclass,Sex) %>% summarize(mean(Survived), n(), mean(Fare))
-
 ```
+
+require(stringr)
+titanic_men <-titanic_men %>% mutate(last_name = str_extract(Name, "[[:alpha:]]+"))
+titanic$num_names <- apply(as.array(titanic$last_name), 1,function(x) sum(x == titanic$last_name))
+titanic_men <- titanic %>% filter(Age > 18 & SibSp == 1 & num_names > 1)
+
+
+
+titanic_women_surv <- titanic %>% filter(Survived == 1 & Sex=="female")
+
+titanic_men$fam_surv<- apply(as.array(titanic_men$last_name), 1,function(x) ifelse(sum(x == titanic_women_surv$last_name)>0,1,0))
+
+titanic_men %>% group_by(fam_surv) %>% summarize(mean(Survived))
+
+
+
+
